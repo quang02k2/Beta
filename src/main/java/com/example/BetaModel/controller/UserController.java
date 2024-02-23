@@ -57,39 +57,6 @@ public class UserController {
     private final LocalizationUtils localizationUtils;
     private final UserDetailsService userDetailsService;
 
-//    @PostMapping("/register")
-//    //can we register an "admin" user ?
-//    public ResponseEntity<RegisterResponse> createUser(
-//            @Valid @RequestBody UserDTO userDTO,
-//            BindingResult result
-//    ) {
-//        RegisterResponse registerResponse = new RegisterResponse();
-//
-//        if (result.hasErrors()) {
-//            List<String> errorMessages = result.getFieldErrors()
-//                    .stream()
-//                    .map(FieldError::getDefaultMessage)
-//                    .toList();
-//
-//            registerResponse.setMessage(errorMessages.toString());
-//            return ResponseEntity.badRequest().body(registerResponse);
-//        }
-//        try {
-//
-//
-//
-//            Users user = userService.createUser(userDTO);
-//            registerResponse.setMessage("Đăng kí thành công");
-//            registerResponse.setUser(user);
-//            return ResponseEntity.ok(registerResponse);
-//        } catch (Exception e) {
-//            registerResponse.setMessage(e.getMessage());
-//            return ResponseEntity.badRequest().body(registerResponse);
-//        }
-//
-
-
-
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> createUser(@Valid @RequestBody UserDTO userDTO, BindingResult result) {
         RegisterResponse registerResponse = new RegisterResponse();
@@ -105,10 +72,6 @@ public class UserController {
         try {
             Users user = userService.createUser(userDTO);
 
-            String a = generateConfirmationCode();
-            // Generate and send confirmation code via email
-            sendConfirmationEmail(userDTO.getEmail(), a);
-
 
             registerResponse.setMessage("Đăng kí thành công");
             registerResponse.setUser(user);
@@ -119,27 +82,6 @@ public class UserController {
             return ResponseEntity.badRequest().body(registerResponse);
         }
     }
-
-
-    @Autowired
-    private JavaMailSender javaMailSender;
-
-    private String generateConfirmationCode() {
-        int code = (int) (Math.random() * 900000) + 100000;
-        return String.valueOf(code);
-    }
-
-    public void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("ongbaanhyeu4@gmail.com");
-        message.setTo(recipientEmail);
-        message.setSubject("Confirmation Code");
-        message.setText("Your confirmation code is: " + confirmationCode);
-        // Send the email
-        javaMailSender.send(message);
-
-    }
-
 
 
 

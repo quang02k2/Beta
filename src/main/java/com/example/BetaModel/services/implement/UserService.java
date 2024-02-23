@@ -23,11 +23,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import javax.mail.MessagingException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -45,35 +48,6 @@ public class UserService implements IUserService {
 
     @Autowired
     private ModelMapper modelMapper;
-//    @Override
-//    public Users createUser(UserDTO userDTO) throws Exception {
-//        //register user
-//        String email = userDTO.getEmail();
-//        // Kiểm tra xem email đã tồn tại hay chưa
-//        if(userRepository.existsByEmail(email)) {
-//            throw new DataIntegrityViolationException("Email already exists");
-//        }
-//        Role userRole = roleRepository.findById(1L).orElseThrow(()
-//                -> new IllegalStateException("Role not found with ID 2"));
-//        //convert from userDTO => user
-//        Users newUser = Users.builder()
-//                .point(userDTO.getPoint())
-//                .email(userDTO.getEmail())
-//                .userName(userDTO.getUserName())
-//                .password(passwordEncoder.encode(userDTO.getPassword()))
-//                .name(userDTO.getName())
-//                .phoneNumber(userDTO.getPhoneNumber())
-//                .isActive(userDTO.isActive())
-//                .role(userRole)
-//                .build();
-//
-//        return userRepository.save(newUser);
-//    }
-
-
-
-
-
 
     @Override
     public Users createUser(UserDTO userDTO) throws Exception {
@@ -101,48 +75,31 @@ public class UserService implements IUserService {
 
         newUser = userRepository.save(newUser);
 
+        String code = generateConfirmationCode();
+        sendConfirmationEmail(userDTO.getEmail(), code);
+
         return newUser;
     }
 
 
-//    public String generateConfirmationCode() {
-//        int code = (int) (Math.random() * 900000) + 100000;
-//        return String.valueOf(code);
-//    }
-//
-//        @Autowired
-//    private JavaMailSender javaMailSender;
-//
-//    public void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException {
-//        SimpleMailMessage message = new SimpleMailMessage();
-//        message.setFrom("ongbaanhyeu4@gmail.com");
-//        message.setTo(recipientEmail);
-//        message.setSubject("Confirmation Code");
-//        message.setText("Your confirmation code is: " + confirmationCode);
-//        // Send the email
-//        javaMailSender.send(message);
-//
-//    }
+    @Autowired
+    private JavaMailSender javaMailSender;
 
-
-
-
-    public Users DtoToUser(UserDTO userDTO){
-        return this.modelMapper.map(userDTO, Users.class);
+    private String generateConfirmationCode() {
+        int code = (int) (Math.random() * 900000) + 100000;
+        return String.valueOf(code);
     }
 
-    public UserDTO UserToDto(Users users){
-        return this.modelMapper.map(users, UserDTO.class);
+    public void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom("ongbaanhyeu4@gmail.com");
+        message.setTo(recipientEmail);
+        message.setSubject("Confirmation Code");
+        message.setText("Your confirmation code is: " + confirmationCode);
+        // Send the email
+        javaMailSender.send(message);
+
     }
-
-
-
-
-
-
-
-
-
 
 
 
@@ -204,21 +161,6 @@ public class UserService implements IUserService {
         this.userRepository.deleteById(userId);
     }
 
-//    @Autowired
-//    private JavaMailSender javaMailSender;
-
-//    @Override
-//    public void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException {
-//        SimpleMailMessage message = new SimpleMailMessage();
-//        message.setFrom("ongbaanhyeu4@gmail.com");
-//        message.setTo(recipientEmail);
-//        message.setSubject("Confirmation Code");
-//        message.setText("Your confirmation code is: " + confirmationCode);
-//        // Send the email
-//        javaMailSender.send(message);
-//
-//    }
-
 
 //    @Autowired
 //    private ConfirmEmailRepo confirmEmailRepo;
@@ -246,7 +188,7 @@ public class UserService implements IUserService {
 //
 //        confirmEmailRepo.save(confirmEmail);
 //    }
-
+//
 
     public Users dtoToUser(UserDTO userDTO){
         return modelMapper.map(userDTO, Users.class);
