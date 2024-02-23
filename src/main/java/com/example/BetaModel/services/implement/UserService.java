@@ -22,14 +22,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import javax.mail.MessagingException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -103,25 +101,34 @@ public class UserService implements IUserService {
 
         newUser = userRepository.save(newUser);
 
-
-        // Send confirmation email
-        String confirmationCode = generateConfirmationCode(); // Replace with your own code to generate confirmation code
-        sendConfirmationEmail(newUser.getEmail(), confirmationCode, this.userToDto(newUser));
-
         return newUser;
     }
 
 
-    private String generateConfirmationCode() {
-        int code = (int) (Math.random() * 900000) + 100000;
-        return String.valueOf(code);
-    }
+//    public String generateConfirmationCode() {
+//        int code = (int) (Math.random() * 900000) + 100000;
+//        return String.valueOf(code);
+//    }
+//
+//        @Autowired
+//    private JavaMailSender javaMailSender;
+//
+//    public void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException {
+//        SimpleMailMessage message = new SimpleMailMessage();
+//        message.setFrom("ongbaanhyeu4@gmail.com");
+//        message.setTo(recipientEmail);
+//        message.setSubject("Confirmation Code");
+//        message.setText("Your confirmation code is: " + confirmationCode);
+//        // Send the email
+//        javaMailSender.send(message);
+//
+//    }
 
 
 
 
     public Users DtoToUser(UserDTO userDTO){
-       return this.modelMapper.map(userDTO, Users.class);
+        return this.modelMapper.map(userDTO, Users.class);
     }
 
     public UserDTO UserToDto(Users users){
@@ -197,8 +204,8 @@ public class UserService implements IUserService {
         this.userRepository.deleteById(userId);
     }
 
-    @Autowired
-    private JavaMailSender javaMailSender;
+//    @Autowired
+//    private JavaMailSender javaMailSender;
 
 //    @Override
 //    public void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException {
@@ -213,32 +220,32 @@ public class UserService implements IUserService {
 //    }
 
 
-    @Autowired
-    private ConfirmEmailRepo confirmEmailRepo;
-
-    public void sendConfirmationEmail(String recipientEmail, String confirmationCode, UserDTO userDTO) throws MessagingException {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("ongbaanhyeu4@gmail.com");
-        message.setTo(recipientEmail);
-        message.setSubject("Confirmation Code");
-        message.setText("Your confirmation code is: " + confirmationCode);
-        // Send the email
-        javaMailSender.send(message);
-
-        // Save the confirmation email in the database
-        ConfirmEmail confirmEmail = new ConfirmEmail();
-        confirmEmail.setRequiredTime(LocalDateTime.now());
-        confirmEmail.setExpiredTime(LocalDateTime.now().plusMinutes(5)); // Set expiration time as desired
-        confirmEmail.setConfirmCode(confirmationCode);
-        confirmEmail.setConfirm(false);
-
-//        Users user = userRepository.findById(userId)
-//                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
-//        confirmEmail.setUsers(user);
-        confirmEmail.setUsers(this.DtoToUser(userDTO));
-
-        confirmEmailRepo.save(confirmEmail);
-    }
+//    @Autowired
+//    private ConfirmEmailRepo confirmEmailRepo;
+//
+//    public void sendConfirmationEmail(String recipientEmail, String confirmationCode, UserDTO userDTO) throws MessagingException {
+//        SimpleMailMessage message = new SimpleMailMessage();
+//        message.setFrom("ongbaanhyeu4@gmail.com");
+//        message.setTo(recipientEmail);
+//        message.setSubject("Confirmation Code");
+//        message.setText("Your confirmation code is: " + confirmationCode);
+//        // Send the email
+//        javaMailSender.send(message);
+//
+//        // Save the confirmation email in the database
+//        ConfirmEmail confirmEmail = new ConfirmEmail();
+//        confirmEmail.setRequiredTime(LocalDateTime.now());
+//        confirmEmail.setExpiredTime(LocalDateTime.now().plusMinutes(5)); // Set expiration time as desired
+//        confirmEmail.setConfirmCode(confirmationCode);
+//        confirmEmail.setConfirm(false);
+//
+////        Users user = userRepository.findById(userId)
+////                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+////        confirmEmail.setUsers(user);
+//        confirmEmail.setUsers(this.DtoToUser(userDTO));
+//
+//        confirmEmailRepo.save(confirmEmail);
+//    }
 
 
     public Users dtoToUser(UserDTO userDTO){

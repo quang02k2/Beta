@@ -15,6 +15,6 @@ public interface IUserService {
 
     void deleteUserId(Long userId);
 
-    void sendConfirmationEmail(String recipientEmail, String confirmationCode, UserDTO userDTO) throws MessagingException;
+//    void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException;
 
     }

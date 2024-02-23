@@ -1,6 +1,8 @@
 package com.example.BetaModel.controller;
 
 
+import com.example.BetaModel.model.*;
+import com.example.BetaModel.respository.ConfirmEmailRepo;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import com.example.BetaModel.components.LocalizationUtils;
@@ -9,10 +11,6 @@ import com.example.BetaModel.dtos.UserDTO;
 import com.example.BetaModel.dtos.UserDtoRefresh;
 import com.example.BetaModel.dtos.UserLoginDTO;
 import com.example.BetaModel.exceptions.TokenRefreshException;
-import com.example.BetaModel.model.ERole;
-import com.example.BetaModel.model.RefreshTokens;
-import com.example.BetaModel.model.Role;
-import com.example.BetaModel.model.Users;
 import com.example.BetaModel.request.SignupRequest;
 import com.example.BetaModel.request.TokenRefreshRequest;
 import com.example.BetaModel.responses.*;
@@ -90,50 +88,14 @@ public class UserController {
 //        }
 //
 
-//    @PostMapping("/register")
-//    public ResponseEntity<RegisterResponse> createUser(
-//            @Valid @RequestBody UserDTO userDTO,
-//            BindingResult result
-//    ) {
-//        RegisterResponse registerResponse = new RegisterResponse();
-//
-//        if (result.hasErrors()) {
-//            List<String> errorMessages = result.getFieldErrors()
-//                    .stream()
-//                    .map(FieldError::getDefaultMessage)
-//                    .toList();
-//
-//            registerResponse.setMessage(errorMessages.toString());
-//            return ResponseEntity.badRequest().body(registerResponse);
-//        }
-//        try {
-//            // Generate and send confirmation code via email
-//            String confirmationCode = generateConfirmationCode();
-//            userService.sendConfirmationEmail(userDTO.getEmail(), confirmationCode, userDTO.getId());
-//
-//            Users user = userService.createUser(userDTO);
-//            registerResponse.setMessage("Đăng kí thành công");
-//            registerResponse.setUser(user);
-//            return ResponseEntity.ok(registerResponse);
-//        } catch (Exception e) {
-//            registerResponse.setMessage(e.getMessage());
-//            return ResponseEntity.badRequest().body(registerResponse);
-//        }
-//    }
-
-
 
 
     @PostMapping("/register")
-    public ResponseEntity<RegisterResponse> createUser(
-            @Valid @RequestBody UserDTO userDTO,
-            BindingResult result
-    ) {
+    public ResponseEntity<RegisterResponse> createUser(@Valid @RequestBody UserDTO userDTO, BindingResult result) {
         RegisterResponse registerResponse = new RegisterResponse();
 
         if (result.hasErrors()) {
-            List<String> errorMessages = result.getFieldErrors()
-                    .stream()
+            List<String> errorMessages = result.getFieldErrors().stream()
                     .map(FieldError::getDefaultMessage)
                     .toList();
 
@@ -141,14 +103,16 @@ public class UserController {
             return ResponseEntity.badRequest().body(registerResponse);
         }
         try {
-
-            // Generate and send confirmation code via email
-            String confirmationCode = generateConfirmationCode();
-            userService.sendConfirmationEmail(userDTO.getEmail(), confirmationCode, userDTO);
-
             Users user = userService.createUser(userDTO);
+
+            String a = generateConfirmationCode();
+            // Generate and send confirmation code via email
+            sendConfirmationEmail(userDTO.getEmail(), a);
+
+
             registerResponse.setMessage("Đăng kí thành công");
             registerResponse.setUser(user);
+
             return ResponseEntity.ok(registerResponse);
         } catch (Exception e) {
             registerResponse.setMessage(e.getMessage());
@@ -157,51 +121,25 @@ public class UserController {
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
     @Autowired
-    AuthenticationManager authenticationManager;
+    private JavaMailSender javaMailSender;
 
-    @Autowired
-    UsersRepo userRepository;
-
-    @Autowired
-    RoleRepo roleRepository;
-
-    @Autowired
-    PasswordEncoder encoder;
-
-    @Autowired
-    JwtUtils jwtUtils;
-
-    @Autowired
-    private RefreshTokenService refreshTokenService;
-
-    @PostMapping("/refreshtoken")
-    public ResponseEntity<?> refreshtoken(@Valid @RequestBody TokenRefreshRequest request) {
-        String requestRefreshToken = request.getRefreshToken();
-
-
-        return refreshTokenService.findByToken(requestRefreshToken)
-                .map(refreshTokenService::verifyExpiration)
-                .map(RefreshTokens::getUsers)
-                .map(user -> {
-                    String token = jwtUtils.generateTokenFromUsername(user.getUsername());
-                    return ResponseEntity.ok(new TokenRefreshResponse(token, requestRefreshToken));
-                })
-                .orElseThrow(() -> new TokenRefreshException(requestRefreshToken,
-                        "Refresh token is not in database!"));
+    private String generateConfirmationCode() {
+        int code = (int) (Math.random() * 900000) + 100000;
+        return String.valueOf(code);
     }
+
+    public void sendConfirmationEmail(String recipientEmail, String confirmationCode) throws MessagingException {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom("ongbaanhyeu4@gmail.com");
+        message.setTo(recipientEmail);
+        message.setSubject("Confirmation Code");
+        message.setText("Your confirmation code is: " + confirmationCode);
+        // Send the email
+        javaMailSender.send(message);
+
+    }
+
 
 
 
@@ -239,12 +177,6 @@ public class UserController {
         return new ResponseEntity<ApiResponse>(new ApiResponse("Course is deleted successfully", true), HttpStatus.OK);
     }
 
-    private String generateConfirmationCode() {
-        int code = (int) (Math.random() * 900000) + 100000;
-        return String.valueOf(code);
-    }
-
-
     @GetMapping("/getAll")
     private ResponseEntity<UserResponse> getAll(@RequestParam( value = "pageNumber",
                                                 defaultValue = AppConstants.PAGE_NUMBER,
@@ -267,6 +199,41 @@ public class UserController {
         UserDTO userDTO = this.userService.getUserId(userId);
         return new ResponseEntity<UserDTO>(userDTO, HttpStatus.OK);
     }
+
+
+
+    @Autowired
+    AuthenticationManager authenticationManager;
+
+    @Autowired
+    UsersRepo userRepository;
+
+    @Autowired
+    RoleRepo roleRepository;
+
+    @Autowired
+    PasswordEncoder encoder;
+
+    @Autowired
+    JwtUtils jwtUtils;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+
+    @PostMapping("/refreshtoken")
+    public ResponseEntity<?> refreshtoken(@Valid @RequestBody TokenRefreshRequest request) {
+        String requestRefreshToken = request.getRefreshToken();
+        return refreshTokenService.findByToken(requestRefreshToken)
+                .map(refreshTokenService::verifyExpiration)
+                .map(RefreshTokens::getUsers)
+                .map(user -> {
+                    String token = jwtUtils.generateTokenFromUsername(user.getUsername());
+                    return ResponseEntity.ok(new TokenRefreshResponse(token, requestRefreshToken));
+                })
+                .orElseThrow(() -> new TokenRefreshException(requestRefreshToken,
+                        "Refresh token is not in database!"));
+    }
+
 
 
 }
