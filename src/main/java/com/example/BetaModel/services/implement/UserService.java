@@ -13,6 +13,7 @@ import com.example.BetaModel.responses.UserResponse;
 import com.example.BetaModel.respository.ConfirmEmailRepo;
 import com.example.BetaModel.respository.RoleRepo;
 import com.example.BetaModel.respository.UsersRepo;
+import com.example.BetaModel.services.iservices.ConfirmEmailService;
 import com.example.BetaModel.services.iservices.IUserService;
 import com.example.BetaModel.utils.MessageKeys;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +28,14 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.mail.MessagingException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -49,6 +52,13 @@ public class UserService implements IUserService {
     @Autowired
     private ModelMapper modelMapper;
 
+    @Autowired
+    private ConfirmEmailRepo confirmEmailRepo;
+
+
+
+    @Autowired
+    private ConfirmEmailService confirmEmailService;
     @Override
     public Users createUser(UserDTO userDTO) throws Exception {
         // Register user
@@ -57,28 +67,47 @@ public class UserService implements IUserService {
         if (userRepository.existsByEmail(email)) {
             throw new DataIntegrityViolationException("Email already exists");
         }
-
         Role userRole = roleRepository.findById(1L)
                 .orElseThrow(() -> new IllegalStateException("Role not found with ID 1"));
 
         // Convert from UserDTO to User
-        Users newUser = Users.builder()
-                .point(userDTO.getPoint())
-                .email(userDTO.getEmail())
-                .userName(userDTO.getUserName())
+        Users newUser = Users.builder().point(userDTO.getPoint())
+                .email(userDTO.getEmail()).userName(userDTO.getUserName())
                 .password(passwordEncoder.encode(userDTO.getPassword()))
-                .name(userDTO.getName())
-                .phoneNumber(userDTO.getPhoneNumber())
-                .isActive(userDTO.isActive())
-                .role(userRole)
-                .build();
+                .name(userDTO.getName()).phoneNumber(userDTO.getPhoneNumber())
+                .isActive(userDTO.isActive()).role(userRole).build();
 
-        newUser = userRepository.save(newUser);
-
-        String code = generateConfirmationCode();
-        sendConfirmationEmail(userDTO.getEmail(), code);
+        checkEmail(newUser);
+//        if (confirmEmailService.checkEmail(newUser.getEmail())) {
+//            userRepository.save(newUser);
+//            return newUser;
+//        } else {
+//            // Handle email verification failure
+//            throw new IllegalStateException("Email verification failed");
+//        }
+        userRepository.save(newUser);
 
         return newUser;
+
+    }
+
+
+    public void checkEmail(Users users){
+        String code = generateConfirmationCode();
+        try {
+            sendConfirmationEmail(users.getEmail(), code);
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
+
+        ConfirmEmail confirmEmail = new ConfirmEmail();
+        confirmEmail.setUsers(users);
+        confirmEmail.setConfirmCode(code);
+        confirmEmail.setRequiredTime(LocalDateTime.now());
+        confirmEmail.setExpiredTime(LocalDateTime.now().plusMinutes(1));
+        confirmEmail.setConfirm(false);
+        confirmEmailRepo.save(confirmEmail);
+
     }
 
 
@@ -121,12 +150,67 @@ public class UserService implements IUserService {
                 email, password,
                 existingUser.getAuthorities()
         );
-        //Xác thực người dùng (nếu xác thực không thành công VD:sai email or sai pass ) thì sẽ ném ra ngoại lệ
+        //Xác thực người dùng
         authenticationManager.authenticate(authenticationToken);
 
         //sinh ngẫu nhiên 1 token từ existingUser
         String token = jwtTokenUtil.generateToken(existingUser);
+
         return token;
+    }
+
+
+    private void saveConfirmationCode(String email, String code) {
+        Optional<Users> existingUser = userRepository.findByEmail(email);
+        existingUser.ifPresent(user -> {
+            ConfirmEmail confirmEmail = confirmEmailRepo.findByUsers(user);
+            if (confirmEmail != null) {
+                confirmEmail.setConfirmCode(code);
+                confirmEmailRepo.save(confirmEmail);
+            }
+        });
+    }
+
+    public void sendConfirmationEmail1(String email) {
+        String code = generateConfirmationCode();
+        try {
+            sendConfirmationEmail(email, code);
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
+        saveConfirmationCode(email, code);
+    }
+
+    public void verifyConfirmationCode(String email, String code) {
+        Optional<Users> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent()) {
+            ConfirmEmail confirmEmail = confirmEmailRepo.findByUsersAndConfirmCode(existingUser.get(), code);
+            confirmEmail.setConfirm(true);
+
+        }
+    }
+
+    public void forgotPass(String email, String newPassword) {
+        Optional<Users> existingUser = userRepository.findByEmail(email);
+        existingUser.ifPresent(user -> {
+            user.setPassword(passwordEncoder.encode(newPassword));
+            userRepository.save(user);
+        });
+    }
+
+
+    public void changePassword(String email, String password, String newPassword) {
+        Optional<Users> existingUser = userRepository.findByEmail(email);
+        existingUser.ifPresent(user -> {
+            // Verify if the provided password matches the user's current password
+            if (passwordEncoder.matches(password, user.getPassword())) {
+                // Update the user's password with the new password
+                user.setPassword(passwordEncoder.encode(newPassword));
+                userRepository.save(user);
+            } else {
+                throw new RuntimeException("Incorrect password.");
+            }
+        });
     }
 
     @Override
@@ -158,37 +242,10 @@ public class UserService implements IUserService {
     @Override
     public void deleteUserId(Long userId) {
         Users users = this.userRepository.findById(userId).orElseThrow(null);
-        this.userRepository.deleteById(userId);
+        this.userRepository.delete(users);
     }
 
 
-//    @Autowired
-//    private ConfirmEmailRepo confirmEmailRepo;
-//
-//    public void sendConfirmationEmail(String recipientEmail, String confirmationCode, UserDTO userDTO) throws MessagingException {
-//        SimpleMailMessage message = new SimpleMailMessage();
-//        message.setFrom("ongbaanhyeu4@gmail.com");
-//        message.setTo(recipientEmail);
-//        message.setSubject("Confirmation Code");
-//        message.setText("Your confirmation code is: " + confirmationCode);
-//        // Send the email
-//        javaMailSender.send(message);
-//
-//        // Save the confirmation email in the database
-//        ConfirmEmail confirmEmail = new ConfirmEmail();
-//        confirmEmail.setRequiredTime(LocalDateTime.now());
-//        confirmEmail.setExpiredTime(LocalDateTime.now().plusMinutes(5)); // Set expiration time as desired
-//        confirmEmail.setConfirmCode(confirmationCode);
-//        confirmEmail.setConfirm(false);
-//
-////        Users user = userRepository.findById(userId)
-////                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
-////        confirmEmail.setUsers(user);
-//        confirmEmail.setUsers(this.DtoToUser(userDTO));
-//
-//        confirmEmailRepo.save(confirmEmail);
-//    }
-//
 
     public Users dtoToUser(UserDTO userDTO){
         return modelMapper.map(userDTO, Users.class);

@@ -3,6 +3,8 @@ package com.example.BetaModel.controller;
 
 import com.example.BetaModel.model.*;
 import com.example.BetaModel.respository.ConfirmEmailRepo;
+import com.example.BetaModel.services.implement.UserService;
+import com.example.BetaModel.services.iservices.ConfirmEmailService;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import com.example.BetaModel.components.LocalizationUtils;
@@ -29,6 +31,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -53,9 +56,13 @@ import java.util.stream.Collectors;
 @RequestMapping("${api.prefix}/users")
 @RequiredArgsConstructor
 public class UserController {
-    private final IUserService userService;
+    private final UserService userService;
     private final LocalizationUtils localizationUtils;
     private final UserDetailsService userDetailsService;
+
+    @Autowired
+    private ConfirmEmailService confirmEmailService;
+
 
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> createUser(@Valid @RequestBody UserDTO userDTO, BindingResult result) {
@@ -70,19 +77,23 @@ public class UserController {
             return ResponseEntity.badRequest().body(registerResponse);
         }
         try {
+
+
+
             Users user = userService.createUser(userDTO);
 
+//            if(confirmEmailService.checkEmail())
+
+//            boolean isCheck = confirmEmailService.checkEmail(userService)
 
             registerResponse.setMessage("Đăng kí thành công");
             registerResponse.setUser(user);
-
             return ResponseEntity.ok(registerResponse);
         } catch (Exception e) {
             registerResponse.setMessage(e.getMessage());
             return ResponseEntity.badRequest().body(registerResponse);
         }
     }
-
 
 
     @PostMapping("/login")
@@ -110,6 +121,56 @@ public class UserController {
                             .message(localizationUtils.getLocalizedMessage(MessageKeys.LOGIN_FAILED, e.getMessage()))
                             .build()
             );
+        }
+    }
+
+//    @PutMapping("/forgotPass")
+//    public ResponseEntity<UserDTO> forgotPassUser(@Valid @RequestBody UserDTO userDTO, @RequestParam String email, @RequestParam String code, @RequestParam String newPassword){
+//        UserDTO update = this.userService.forgotPassword(userDTO, email,code, newPassword);
+//        return new ResponseEntity<UserDTO>(update, HttpStatus.OK);
+//    }
+//
+////    @PreAuthorize("hasRole('USER')")
+//    @PutMapping("/changePass")
+//    public ResponseEntity<UserDTO> changePassUser(@Valid @RequestBody UserDTO userDTO, @RequestParam String password, @RequestParam String newPassword){
+//        UserDTO update = this.userService.changePassword(userDTO, password, newPassword);
+//        return new ResponseEntity<UserDTO>(update, HttpStatus.OK);
+//    }
+
+
+    @PostMapping("/confirmation")
+    public ResponseEntity<String> sendConfirmationEmail(@RequestParam String email) {
+        try {
+            userService.sendConfirmationEmail1(email);
+            return ResponseEntity.ok("Confirmation email sent successfully.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to send confirmation email.");
+        }
+    }
+
+    @GetMapping("/confirmation/verify")
+    public ResponseEntity<ApiResponse> verifyConfirmationCode(@RequestParam String email, @RequestParam String code) {
+        userService.verifyConfirmationCode(email, code);
+        return new ResponseEntity<ApiResponse>(new ApiResponse("true", true), HttpStatus.OK);
+    }
+
+    @PutMapping("/forgotPass")
+    public ResponseEntity<String> forgotPassCode(@Valid @RequestParam String email, @RequestParam String newPassword) {
+        try {
+            userService.forgotPass(email, newPassword);
+            return ResponseEntity.ok("Successfully created new password");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to create new password");
+        }
+    }
+
+    @PostMapping("/password/change")
+    public ResponseEntity<String> changePassword(@RequestParam("email") String email,@RequestParam String password, @RequestParam("newPassword") String newPassword) {
+        try {
+            userService.changePassword(email, password, newPassword);
+            return ResponseEntity.ok("Password changed successfully.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to change password.");
         }
     }
 
@@ -161,6 +222,7 @@ public class UserController {
 
     @Autowired
     private RefreshTokenService refreshTokenService;
+
 
     @PostMapping("/refreshtoken")
     public ResponseEntity<?> refreshtoken(@Valid @RequestBody TokenRefreshRequest request) {

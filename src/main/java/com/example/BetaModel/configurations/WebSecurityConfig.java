@@ -46,6 +46,8 @@ public class WebSecurityConfig {
                             .requestMatchers(DELETE,
                                     String.format("%s/post/**", apiPrefix)).permitAll()
                             .requestMatchers(PUT,
+                                    String.format("%s/put/**", apiPrefix)).permitAll()
+                            .requestMatchers(PUT,
                                     String.format("%s/post/**", apiPrefix)).permitAll()
                             .requestMatchers(PUT,
                                     String.format("%s/adminApprovePost/**", apiPrefix)).hasRole("ADMIN")
